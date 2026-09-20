@@ -1,0 +1,30 @@
+# Data: raw pulls are immutable and never tracked (they also contain CPF/CNPJ)
+data/raw/*
+data/interim/*
+data/processed/*
+!data/raw/.gitkeep
+!data/interim/.gitkeep
+!data/processed/.gitkeep
+
+# DuckDB analytical database is a build artifact, rebuilt by `make`
+*.duckdb
+*.duckdb.wal
+
+# Secrets
+.env
+*.salt
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# OS / editors
+.DS_Store
+.vscode/
+.idea/
