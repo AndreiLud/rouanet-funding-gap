@@ -16,6 +16,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from src.cohorts import classify, window_state
 from src.config import DATA_INTERIM, REPORTS
 
 log = logging.getLogger("quality")
@@ -105,6 +106,40 @@ def run(df: pd.DataFrame) -> str:
     sit = df["situacao"].value_counts()
     body = "\n".join(f"- {v:,}  {k}" for k, v in sit.items())
     out.append(_section(f"Situacao values ({len(sit)} distinct)", body))
+
+    # 8. Fundraising window, which decides the analysable sample
+    df = df.assign(state=df["situacao"].map(classify),
+                   window=df["situacao"].map(window_state))
+    unmapped = int((df["state"] == "unmapped").sum())
+    ct = pd.crosstab(df["ano_projeto"], df["state"])
+    ct["total"] = ct.sum(axis=1)
+    ct["pct_open"] = (ct.get("open", 0) / ct["total"] * 100).round(1)
+    lines = [f"- situacao values that no rule matched: {unmapped}", "",
+             "| cohort | closed | open | withdrawn | pre_approval | total | % open |",
+             "| --- | --- | --- | --- | --- | --- | --- |"]
+    for y, r in ct.iterrows():
+        cell = lambda k: f"{int(r.get(k, 0) or 0):,}"
+        lines.append(f"| {int(y)} | {cell('closed')} | {cell('open')} | "
+                     f"{cell('withdrawn')} | {cell('pre_approval')} | "
+                     f"{int(r['total']):,} | {r['pct_open']} |")
+    out.append(_section("Fundraising window by cohort", "\n".join(lines)))
+
+    # 9. Outcome by cohort, restricted to a closed window and an approved amount
+    a = df[(df["window"] == "closed") & (df["valor_aprovado"] > 0)].copy()
+    a["ratio"] = a["valor_captado"] / a["valor_aprovado"]
+    lines = ["| cohort | n | raised >0% | >=20% | >=50% | >=100% |",
+             "| --- | --- | --- | --- | --- | --- |"]
+    for y, g in a.groupby("ano_projeto"):
+        lines.append(f"| {int(y)} | {len(g):,} | {(g.ratio > 0).mean():.1%} | "
+                     f"{(g.ratio >= .2).mean():.1%} | {(g.ratio >= .5).mean():.1%} | "
+                     f"{(g.ratio >= 1).mean():.1%} |")
+    lines.append("")
+    lines.append("A cohort with a high share still open cannot be read from this table: "
+                 "the projects that close first are disproportionately the ones that "
+                 "closed for raising nothing, so a partially open cohort understates "
+                 "the rate. Only cohorts that are essentially fully closed are usable.")
+    out.append(_section("Outcome by cohort (closed window, valor_aprovado > 0)",
+                        "\n".join(lines)))
 
     return "\n".join(out)
 

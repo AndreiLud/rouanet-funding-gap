@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import gzip
 import json
+import os
 import logging
 import sys
 import time
@@ -70,10 +71,34 @@ def _get(path: str, params: dict) -> dict:
 
 def _write(target: Path, payload: dict, meta: dict) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
-    tmp = target.with_suffix(target.suffix + ".part")
+    # The scratch name carries the pid. Two collectors running at once (easy to start
+    # by accident) would otherwise interleave writes into one shared .part and leave a
+    # file with a valid gzip header and garbage after the first member.
+    tmp = target.with_suffix(target.suffix + f".{os.getpid()}.part")
     with gzip.open(tmp, "wt", encoding="utf-8") as fh:
         json.dump({"_meta": meta, "response": payload}, fh, ensure_ascii=False)
+    _verify(tmp)
     tmp.replace(target)  # atomic, so an interrupted write never leaves a half page
+
+
+def _verify(path: Path) -> None:
+    """Read a page back. A page counts as collected only once this passes."""
+    with gzip.open(path, "rt", encoding="utf-8") as fh:
+        json.load(fh)
+
+
+def _is_complete(path: Path) -> bool:
+    """Resume predicate: a file that merely exists can still be truncated or
+    interleaved, so check that it reads back and re-fetch it if it does not."""
+    if not path.exists():
+        return False
+    try:
+        _verify(path)
+        return True
+    except (OSError, ValueError):
+        log.warning("re-fetching unreadable page %s", path.name)
+        path.unlink(missing_ok=True)
+        return False
 
 
 def _page_count(total: int) -> int:
@@ -93,7 +118,7 @@ def collect_projetos() -> None:
                 DATA_RAW / "projetos" / f"collected={COLLECTED_ON}"
                 / f"area={code}" / f"offset={offset:07d}.json.gz"
             )
-            if target.exists():
+            if _is_complete(target):
                 continue
             params = {"limit": PAGE_LIMIT, "offset": offset, "area": code}
             payload = _get("projetos", params)
@@ -118,7 +143,7 @@ def collect_listing(endpoint: str) -> None:
             DATA_RAW / endpoint / f"collected={COLLECTED_ON}"
             / f"offset={offset:07d}.json.gz"
         )
-        if target.exists():
+        if _is_complete(target):
             continue
         params = {"limit": PAGE_LIMIT, "offset": offset}
         payload = _get(endpoint, params)
