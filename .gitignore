@@ -1,4 +1,6 @@
-# Data: raw pulls are immutable and never tracked (they also contain CPF/CNPJ)
+# Data: raw pulls are immutable and never tracked (they also contain CPF/CNPJ).
+# app/data/ is the exception and IS tracked: it is a small aggregate artefact with no
+# identifier of any kind, and Streamlit Community Cloud deploys from the repository.
 data/raw/*
 data/interim/*
 data/processed/*

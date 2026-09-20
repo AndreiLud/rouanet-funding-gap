@@ -131,6 +131,30 @@ def build(collected_on: str | None = None) -> pd.DataFrame:
     return df
 
 
+def build_incentivadores(collected_on: str | None = None) -> pd.DataFrame:
+    """Sponsors. `total_doado` is a lifetime total with no time dimension, so this
+    supports a cross section of concentration and not a per year series. Sponsors are
+    carried as a salted hash for the same reason proponents are: some are individuals.
+    """
+    salt = _salt()
+    root = DATA_RAW / "incentivadores"
+    pattern = f"collected={collected_on}" if collected_on else "collected=*"
+    rows = []
+    for path in sorted(root.glob(f"{pattern}/offset=*.json.gz")):
+        with gzip.open(path, "rt", encoding="utf-8") as fh:
+            blob = json.load(fh)
+        for rec in blob["response"].get("_embedded", {}).get("incentivadores", []):
+            rows.append({
+                "incentivador_hash": _hash(rec.get("cgccpf"), salt),
+                "tipo_pessoa": rec.get("tipo_pessoa"),
+                "UF": rec.get("UF"),
+                "total_doado": _money(rec.get("total_doado")),
+            })
+    df = pd.DataFrame(rows)
+    log.info("parsed %d sponsors", len(df))
+    return df
+
+
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     df = build()
@@ -138,6 +162,12 @@ def main() -> int:
     out = DATA_INTERIM / "projetos.parquet"
     df.to_parquet(out, index=False)
     log.info("wrote %s (%d rows, %d cols)", out, len(df), df.shape[1])
+
+    inc = build_incentivadores()
+    if len(inc):
+        out_inc = DATA_INTERIM / "incentivadores.parquet"
+        inc.to_parquet(out_inc, index=False)
+        log.info("wrote %s (%d rows)", out_inc, len(inc))
     return 0
 
 

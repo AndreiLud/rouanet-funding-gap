@@ -103,6 +103,10 @@ def main() -> int:
         CREATE VIEW analysable AS
         SELECT * FROM projetos WHERE in_model_sample
     """)
+    inc_path = DATA_INTERIM / "incentivadores.parquet"
+    if inc_path.exists():
+        con.execute("CREATE TABLE incentivadores AS SELECT * FROM read_parquet(?)",
+                    [str(inc_path)])
     n = con.execute("SELECT count(*) FROM analysable").fetchone()[0]
     con.close()
 
