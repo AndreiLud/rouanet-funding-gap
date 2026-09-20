@@ -2,9 +2,8 @@
 
 **Approved is not funded: who actually raises money through Brazil's Rouanet Law**
 
-Status: written before collection. Section 9 records a blocker that has to be cleared
-before any data can be pulled. No number in this document comes from data, because no
-data has been collected yet.
+Status: contract verified against the live API on 2026-09-20. The counts in section 3
+were produced by querying the API, not estimated. No modelling result exists yet.
 
 ## 1. The decision
 
@@ -28,57 +27,68 @@ of the approved amount, using only what is known at approval time?**
    of that segment in that UF)?
 4. Where does the model fail hardest?
 
-## 3. Data source and contract
+## 3. Data source and contract (verified live, 2026-09-20)
 
-SALIC API, open, no authentication. Host `api.salic.cultura.gov.br`, basePath `/v1`,
-spec version 0.2.1-beta.
+SALIC API, open, no authentication. Base URL `https://api.salic.cultura.gov.br`,
+base path `/api/v1`. The live API is a Laravel rewrite documented with Scribe at
+`/docs` (last updated 2026-09-14), not the Flask service whose OpenAPI spec is still
+published in the old public source repository. The differences below were found by
+querying the live service, and they are the reason the earlier draft of this section was
+wrong.
 
-Endpoints used: `/projetos/` (list), `/projetos/{PRONAC}` (detail),
-`/projetos/areas`, `/projetos/segmentos`, `/proponentes/`, `/incentivadores/`,
-`/incentivadores/{id}/doacoes`.
+Endpoints used: `/api/v1/projetos`, `/api/v1/projetos/areas`,
+`/api/v1/projetos/segmentos`, `/api/v1/proponentes`, `/api/v1/incentivadores`.
 
-Fields returned by `/projetos/` (`ProjetoList`): `PRONAC`, `ano_projeto`, `nome`,
-`cgccpf`, `proponente`, `segmento`, `area`, `UF`, `municipio`, `data_inicio`,
-`data_termino`, `situacao`, `mecanismo`, `enquadramento`, `valor_projeto`,
-`outras_fontes`, `valor_captado`, `valor_proposta`, `valor_solicitado`,
-`valor_aprovado`, plus free text fields (`objetivos`, `justificativa`, `sinopse`,
-`resumo`, and others).
+**Path form.** Requests must omit the trailing slash. `/api/v1/projetos/` answers 301 to
+the same path over plain HTTP, which is both a downgrade and unreachable from a
+proxied environment. `/v1/projetos` (the old base path) answers 404.
 
-`Proponente`: `nome`, `cgccpf`, `responsavel`, `tipo_pessoa`, `UF`, `municipio`,
-`total_captado`. `Incentivador`: same shape with `total_doado`. `Doacao` and `Captacao`:
-`PRONAC`, `valor`, `data_recibo`, `nome_projeto`, `cgccpf`, `nome_doador`.
+**Coverage.** The service holds 61,337 projects, and they are not the full history of the
+law. Counting by `ano_projeto`: 2019 has 3,508, 2020 has 4,683, 2021 has 2,645, 2022 has
+2,681, 2023 has 10,722, 2024 has 14,215, 2025 has 15,415, 2026 has 7,466, plus one
+record each in 2016 and 2018. Those sum to 61,337, the reported total. Every year before
+2019 answers `{"message": "No project was found with your criteria", "message_code": 11}`.
+The analysis window is therefore 2019 to 2026, not the 1990s onwards.
 
-Collection mechanics, as specified:
+**Fields returned by `/api/v1/projetos`** (35 keys, present on all 100 records of a
+sampled page): `PRONAC`, `nome`, `proponente`, `cgccpf`, `situacao`, `providencia`,
+`UF`, `municipio`, `local_realizacao` (a list of municipalities with IBGE codes),
+`segmento`, `tipicidade`, `tipologia`, `enquadradmento`, `mecanisnmo`, `ano_projeto`,
+`data_inicio`, `data_termino`, `valor_solicitado`, `valor_aprovado`, `valor_projeto`,
+`valor_captado`, `valor_proposta`, `outras_fontes`, the free text blocks
+(`objetivos`, `justificativa`, `resumo`, `sinopse`, `etapa`, `ficha_tecnica`,
+`acessibilidade`, `democratizacao`, `impacto_ambiental`, `especificacao_tecnica`,
+`estrategia_execucao`), and `_links`.
 
-- Pagination is `limit` and `offset`. `limit` defaults to 100 and is capped at 100
-  (`LIMIT_PAGING`); asking for more returns an error rather than more rows.
-- The total row count comes from the `X-Total-Count` response header.
-- The `next` link in the HAL `_links` block advances the offset by 1 instead of by the
-  page size, so pagination is driven by our own offset arithmetic against
-  `X-Total-Count`, not by following links.
-- Rate limiting is announced through `X-Rate-Limit-Limit`,
-  `X-Rate-Limit-Remaining`, `X-Rate-Limit-Reset` and `Retry-After`. The collector
-  honours `Retry-After` and backs off exponentially on 5xx.
-- Every page is written to `data/raw/` as received, named with endpoint, offset and
-  collection date. Collection resumes by skipping pages already on disk.
+`enquadradmento` and `mecanisnmo` are spelled that way by the API. The field names are
+kept verbatim on ingest and renamed only in the processed layer, so that a raw page can
+always be traced back.
 
-Three things about this contract are worth stating plainly. First, `ano_projeto` is a
-two digit year, so the century has to be reconstructed (the law dates from the 1990s, so
-93 to 99 maps to 19xx and 00 onwards to 20xx). Second, `data_inicio` and `data_termino`
-are the project's execution window, not the fundraising window, and no approval date and
-no fundraising deadline are exposed by the list endpoint. Third, `valor_aprovado` and
-`valor_projeto` are computed server side and are defined differently for the agreement
-mechanisms (`mecanismo` 2 and 6), where `valor_projeto` equals the approved agreement
-value instead of approved plus other sources. Those mechanisms are flagged and analysed
-separately.
+**`area` is not in the payload.** The old contract returned it; the live one does not,
+although `area` still works as a query parameter. It is recovered by sweeping the 8 area
+codes from `/api/v1/projetos/areas` (Artes Cenicas 18,677, Audiovisual 6,301, Musica
+17,363, Artes Visuais 6,776, Patrimonio Cultural 1,970, Humanidades 8,722, Artes
+Integradas 324, Museus e Memoria 1,204) and tagging each record with the code used in the
+request. Those counts sum to exactly 61,337, so the sweep is a partition: no project is
+missed and none is fetched twice.
 
-**Verification caveat.** This contract was read from the OpenAPI specification and query
-code published in the API's own source repository, because the live host is not
-reachable from this environment (section 9). The published snapshot is from 2018, so
-before any of it is used, every endpoint, parameter and field above is re-checked against
-a live response, and `docs/data_dictionary.md` is written from observed responses rather
-than from the spec. Any field that does not survive that check is removed from the plan,
-not worked around.
+**`ano_projeto` is the approval year.** The live documentation defines it as "ano em que o
+projeto foi aprovado", where the old spec said the year it was submitted. This is the
+cohort variable, and it is still two digits.
+
+**Pagination.** `limit` in [1, 100], `offset` in [0, total]. The body carries `count` (rows
+in this response) and `total` (rows matching the query). The documented `X-Total-Count`
+header was not present on the responses observed, so pagination is driven by the body's
+`total`. At `limit=100` the full sweep is 614 pages.
+
+**Other parameters**: `PRONAC`, `proponente`, `proponente_id`, `cgccpf`, `nome`, `area`,
+`segmento`, `UF`, `ano_projeto`, `data_inicio`, `data_termino` and their `_min` and
+`_max` forms, `ano_captacao` (an integer year derived from the receipt date `DtRecibo`),
+`sort` (default `ano_projeto:desc`) and `format` (HAL+JSON by default, also XML and CSV).
+
+**Volume.** A sampled page averages 28,562 bytes per record, dominated by the free text
+blocks, so the full pull is about 1.6 GB of JSON. Raw pages are stored gzipped, which
+keeps them byte for byte as received while fitting the disk budget.
 
 ## 4. Target
 
@@ -94,24 +104,33 @@ observed distribution in step 2 before being fixed.
 ## 5. Censoring
 
 Recent projects are still inside their fundraising window, so their `valor_captado` is
-not final and reads as failure. Since the API exposes no fundraising deadline, the
-window has to be established empirically: for a random sample of projects we pull
-`/projetos/{PRONAC}` and measure, from the `captacoes` block, the distribution of
-(year of last `data_recibo` minus `ano_projeto`). The cohort cutoff is set at a high
-percentile of that distribution, and the analysis keeps only cohorts whose window is
-closed by that rule.
+not final and reads as failure.
 
-That is the primary approach: it matches the producer's binary decision and keeps the
-model simple. The cost is that it discards the most recent years, which is exactly where
-regime changes are most interesting, and the cutoff is a modelling choice rather than a
-documented rule. The alternative, treating this as time to event with right censoring,
-is noted in the model card as the natural extension and is not the headline model.
+The live data settles this better than the percentile rule in the earlier draft, because
+`situacao` states the outcome of the window directly. Values such as "Projeto encerrado
+por excesso de prazo sem captacao" mark a window that closed with nothing raised, while
+"Autorizada a captacao total dos recursos" marks one that is still open. A cohort is
+included when its projects have reached a terminal `situacao`, and the share of
+non-terminal cases per cohort is reported so the reader can see where the window is
+still closing.
+
+This uses `situacao` to decide **who is in the sample**, never as a feature. That
+distinction is the one that has to hold: a variable settled after the fact can define the
+analysable universe without being allowed to predict within it. The rule and the terminal
+value list go in `docs/data_dictionary.md`, and the cutoff is cross checked against the
+`ano_captacao` filter, which reports fundraising activity by receipt year.
+
+The cost is severe and has to be stated: with coverage starting in 2019 and the most
+recent cohorts still open, only a handful of approval cohorts are usable, so the temporal
+split is thin and 2020 and 2021 sit inside it. Section 11 carries the consequence.
 
 ## 6. Leakage rules
 
-In: `valor_aprovado`, `valor_solicitado`, `valor_proposta`, `outras_fontes`, `area`,
-`segmento`, `UF`, `municipio` (grouped), `mecanismo`, `enquadramento`, cohort year,
-project duration as declared at approval, and proponent history features.
+In: `valor_aprovado`, `valor_solicitado`, `valor_proposta`, `outras_fontes`, `area`
+(recovered by the sweep), `segmento`, `tipicidade`, `tipologia`, `UF`, `municipio`
+(grouped), number of municipalities in `local_realizacao`, `mecanisnmo`,
+`enquadradmento`, cohort year, project duration as declared at approval, and proponent
+history features. The last two field names carry the API's own spelling.
 
 Out, with the reason recorded per field in `docs/data_dictionary.md`: `valor_captado`
 (it is the target), `situacao` (current status, settled after the fact), anything from
@@ -156,14 +175,15 @@ which is a much heavier pull. The limitation is stated rather than patched with 
 biased top K sample. Natural persons appear only inside aggregates, identified by a
 salted hash, never by name.
 
-## 9. Blocker: no network access to the data source
+## 9. Collection
 
-`api.salic.cultura.gov.br`, `salic.cultura.gov.br`, `dados.cultura.gov.br` and
-`dados.gov.br` are all refused by this environment's egress policy (the proxy returns
-403 on CONNECT, so no request reaches the API). Collection cannot start, and no number
-in this repository can be produced, until that host is allowed. The options are to add
-the host to the environment's allowed domains, or to run the collector outside this
-environment and bring the raw pages in.
+`api.salic.cultura.gov.br` and `dados.cultura.gov.br` were added to the environment's
+allowed domains on 2026-09-20, and the contract in section 3 was verified against the
+live service. The earlier blocker is cleared.
+
+Collection sweeps the 8 area codes, writes one gzipped raw page per request under
+`data/raw/` named with endpoint, area, offset and collection date, honours `Retry-After`,
+backs off exponentially on 5xx, and resumes by skipping pages already on disk.
 
 ## 10. Deliverables
 
@@ -177,9 +197,18 @@ the calibrated model probability, and the limitations in plain language.
 
 ## 11. What would make this project wrong
 
-The cohort cutoff is inferred, not documented, so a wrong cutoff mislabels late
-fundraisers as failures. `valor_aprovado` is computed server side and defined differently
-by mechanism. Approval-time information is thin: no evaluation score, no committee
-decision, no sponsor pipeline, so a producer's real advantage (who they already know) is
-invisible here and the model can only be a prior, not a forecast. The app says this in
-plain words.
+The coverage window is the binding constraint. The API starts at approval year 2019, so
+"how it changed over time" spans 2019 to 2026 and not the history of the law, and once
+the open cohorts are removed only a few remain to train and test on. Those few include
+2020 and 2021, so a pandemic effect and a cohort effect cannot be cleanly separated:
+this is reported as a limitation, not modelled away.
+
+The cohort rule leans on `situacao`, which is a settled administrative status and can be
+stale or inconsistent, so a wrong terminal list mislabels late fundraisers as failures.
+Records with `valor_captado` above `valor_aprovado` exist and reach large multiples, so
+the impossible-value check is not a formality and whatever it finds goes in the cleaning
+log rather than being silently clipped.
+
+Approval-time information is thin: no evaluation score, no committee decision, no sponsor
+pipeline, so a producer's real advantage (who they already know) is invisible here and the
+model can only be a prior, not a forecast. The app says this in plain words.
