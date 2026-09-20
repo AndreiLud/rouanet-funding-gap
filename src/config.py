@@ -33,8 +33,11 @@ AREA_CODES = {
     "9": "Museus e Memoria",
 }
 
-# Pacing. The API has been unstable in the past, so stay well short of hammering it.
-REQUEST_PAUSE_S = 0.35
+# Pacing. Observed on 2026-09-20: a sustained sweep at 0.35s between requests gets
+# rate limited after a few hundred pages, and the API then answers with a Retry-After
+# that the collector honours, which stretches a page out to minutes. A slower steady
+# pace finishes sooner than a fast one that trips the limiter.
+REQUEST_PAUSE_S = 1.0
 MAX_RETRIES = 6
 BACKOFF_BASE_S = 2.0
 TIMEOUT_S = 180

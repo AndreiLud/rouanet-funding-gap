@@ -16,7 +16,7 @@ setup: ## Create the virtualenv and install pinned dependencies
 	$(PIP) install --quiet -r requirements.txt
 
 collect: ## Pull every page from the SALIC API into data/raw (resumable, slow)
-	$(PY) -m src.collect reference projetos
+	$(PY) -u -m src.collect reference projetos
 
 interim: ## Parse raw pages into data/interim/projetos.parquet
 	$(PY) -m src.build_interim
