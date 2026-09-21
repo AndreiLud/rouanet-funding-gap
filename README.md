@@ -31,13 +31,21 @@ the middle is where most projects sit (7,662 of 12,722) and where they fail most
 17.6% in the Federal District to 50.2% in Ceara and 49.9% in Santa Catarina, a spread
 more than three times wider than the spread across artistic areas.
 
-**4. The money is extraordinarily concentrated.** The top 10% of proponents took 67% to
-80% of everything raised, depending on the cohort, with a Gini between 0.80 and 0.89. On
-the sponsor side it is more extreme still: across all 113,757 sponsors the API records,
-the top 10% account for 98.4% of the R$ 35.6 billion donated and the top 1% for 81.5%,
-a Gini of 0.981. 90,276 of those sponsors are individuals and together they contribute
-1.9% of the money. This is a corporate tax mechanism with a long tail of private donors
-attached.
+**4. It is a mechanism between organisations, and the money inside it is
+extraordinarily concentrated.** Individual artists are 25.0% of approved projects and
+receive 2.4% of the money: 74.5% of them raise nothing at all against 41.8% of
+organisations, and they reach half their target 18.1% of the time against 46.6%. The
+same shape appears at the other end, where 90,276 of the 113,757 sponsors are
+individuals and together contribute 1.9% of the money. Within that, the top 10% of
+proponents took 67% to 80% of everything raised depending on the cohort (Gini 0.80 to
+0.89), and the top 10% of sponsors account for 98.4% of the R$ 35.6 billion donated,
+with the top 1% at 81.5% and a Gini of 0.981.
+
+One caveat on the proponent figure: the API masks a natural person's document, so the
+identifier for an individual is a hash of a mask, and two people whose visible digits
+coincide merge into one. That can only overstate concentration. Restricted to
+organisations, where the document is complete and no merging is possible, the top decile
+still holds 61.8% to 75.3%, so the finding survives the bound.
 
 **5. The rate has been flat since 2019, and anything that looks like a recent collapse
 is an artefact.** Cohorts 2019 to 2022 sit between 36% and 44%. Later cohorts appear to

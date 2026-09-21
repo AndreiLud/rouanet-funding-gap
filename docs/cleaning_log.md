@@ -118,3 +118,23 @@ survives downstream only as a salted hash, and the salt is generated per checkou
 not committed. Some proponents are individuals trading under a CNPJ whose registered name
 contains their own name, so the name is dropped outright rather than filtered by person
 type.
+
+**Correction, made after the proponents endpoint finished collecting.** The API masks a
+natural person's document, returning values like `***000*****`, and returns a company's
+CNPJ in full. An earlier version of the parser inferred a natural person by testing for
+an 11 digit CPF, which never matched, because stripping the mask characters leaves only
+the few visible digits. The flag was therefore silently always False. It now tests for
+the mask, which flags 11,672 of 61,337 projects, and the rule was checked against the
+`tipo_pessoa` field on the proponents endpoint, where masking and the declared type agree
+exactly.
+
+Two consequences follow, and neither was visible before the correction:
+
+- The raw pages contain complete CNPJs and masked CPFs, not complete CPFs. That is a
+  weaker privacy exposure than the earlier note in this log implied, and the handling
+  does not change: the document and the name still never leave `data/raw`.
+- The hash identifying a natural person is a hash of a mask, so two individuals whose
+  visible digits coincide become one proponent. 9,113 distinct masks cover 11,672
+  projects and the largest covers 11, so the merging is small, and it can only overstate
+  concentration. The README reports the bound from organisations only, where the document
+  is complete and no merging is possible.

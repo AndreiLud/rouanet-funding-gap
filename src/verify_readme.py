@@ -24,7 +24,10 @@ def claims() -> list[tuple[str, str]]:
     con = duckdb.connect(str(DUCKDB_PATH), read_only=True)
     cat = con.execute((ROOT / "sql" / "q1_funding_rate_by_category.sql").read_text()).df()
     spon = con.execute((ROOT / "sql" / "q2b_concentration_sponsors.sql").read_text()).df().iloc[0]
+    tipo = con.execute((ROOT / "sql" / "q3_pessoa_fisica_vs_juridica.sql").read_text()).df()
     con.close()
+    pf = tipo[tipo.tipo == "pessoa fisica"].iloc[0]
+    pj = tipo[tipo.tipo == "pessoa juridica"].iloc[0]
     test = pd.read_csv(REPORTS / "test_results.csv", index_col=0)
 
     def band(v):
@@ -57,6 +60,12 @@ def claims() -> list[tuple[str, str]]:
         (f"{test.loc['baseline_segment_uf_rate', 'pr_auc']:.3f}", "heuristic PR-AUC"),
         (f"{test.loc['baseline_segment_uf_rate', 'brier']:.3f}", "heuristic Brier"),
         (f"{test.loc['baseline_majority', 'pr_auc']:.3f}", "majority PR-AUC"),
+        (f"{pf['pct_dos_projetos']:.1f}%", "share of projects, natural persons"),
+        (f"{pf['pct_do_dinheiro']:.1f}%", "share of money, natural persons"),
+        (f"{pf['taxa_zero']*100:.1f}%", "natural persons raising nothing"),
+        (f"{pj['taxa_zero']*100:.1f}%", "organisations raising nothing"),
+        (f"{pf['taxa_ge50']*100:.1f}%", "natural persons reaching half"),
+        (f"{pj['taxa_ge50']*100:.1f}%", "organisations reaching half"),
     ]
 
 

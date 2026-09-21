@@ -8,6 +8,12 @@ going back to the raw pages:
    to count concentration, and is not enough to name anybody. Some proponents are
    individuals trading under a CNPJ whose registered name contains their own name, so
    dropping the name is safer than trying to classify who is a natural person.
+   The API itself masks a natural person's document (values like `***000*****`) and
+   returns a company's CNPJ in full, so the hash for a natural person is a hash of a
+   mask. That is weaker as an identifier: two different people whose visible digits
+   coincide collapse into one. Measured on the analysable sample, 9,113 distinct masks
+   cover 11,672 projects and the largest covers 11, so the merging is small, and it can
+   only overstate concentration. The bound is reported next to the headline.
 2. The salt is generated once into a gitignored file. A random salt per machine means
    the hashes are not comparable across checkouts, which is deliberate: every aggregate
    this project reports is identical either way, and a fixed committed salt would make
@@ -110,10 +116,13 @@ def build(collected_on: str | None = None) -> pd.DataFrame:
                 "data_inicio": rec.get("data_inicio"),
                 "data_termino": rec.get("data_termino"),
                 "proponente_hash": _hash(rec.get("cgccpf"), salt),
-                # A CPF has 11 digits, a CNPJ 14. Used only to flag the row, never to name.
-                "proponente_pessoa_fisica": len(
-                    "".join(ch for ch in str(rec.get("cgccpf") or "") if ch.isdigit())
-                ) == 11,
+                # The API masks a natural person's document and leaves a company's CNPJ
+                # in full, so the presence of an asterisk is what marks a pessoa fisica.
+                # An earlier version tested for an 11 digit CPF, which never matched
+                # because stripping the mask characters leaves only a few digits, so the
+                # flag was silently always False. Checked against the tipo_pessoa field
+                # on the proponentes endpoint: masking and tipo_pessoa agree exactly.
+                "proponente_pessoa_fisica": "*" in str(rec.get("cgccpf") or ""),
                 "n_municipios": len(rec.get("local_realizacao") or []),
                 "_source_page": path.name,
                 "_source_area": meta["area_code"],
