@@ -1,0 +1,6 @@
+{
+  "selected": "logistic",
+  "folds": 2,
+  "train_n": 10102,
+  "test_n": 2620
+}
