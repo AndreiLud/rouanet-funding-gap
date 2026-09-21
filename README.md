@@ -134,7 +134,8 @@ Community Cloud from the repository alone.
 ## Data and privacy
 
 Source: [SALIC API](https://api.salic.cultura.gov.br/docs), open and unauthenticated,
-collected 2026-09-20. Raw pages contain CPF and CNPJ and are never committed. Proponents
+collected 2026-09-20: 61,337 projects across approval cohorts 2019 to 2026, of which
+12,722 are analysable. Raw pages contain CPF and CNPJ and are never committed. Proponents
 and sponsors are carried downstream only as a salted hash, the salt is generated per
 checkout and is not committed, and the artefact the app reads contains no identifier of
 any kind.

@@ -5,7 +5,7 @@
 PY := .venv/bin/python
 PIP := .venv/bin/pip
 
-.PHONY: help setup collect interim quality processed model error figures app-data app all clean clean-derived
+.PHONY: help setup collect interim quality processed model error figures app-data app verify all clean clean-derived
 
 help:
 	@grep -E '^[a-z-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-14s %s\n", $$1, $$2}'
@@ -42,13 +42,15 @@ app-data: processed ## Build the committed artefact the Streamlit app reads
 app: app-data ## Run the Streamlit app locally
 	$(PY) -m streamlit run app/streamlit_app.py
 
-all: interim quality processed model error figures app-data ## Rebuild everything downstream of data/raw
+verify: ## Check that every number and path in the README still matches the pipeline
+	$(PY) -m src.verify_readme
+
+all: interim quality processed model error figures app-data verify ## Rebuild everything downstream of data/raw
 
 clean-derived: ## Delete everything the pipeline generates, keeping data/raw
 	rm -rf data/interim/* data/processed/* reports/*.md reports/*.csv \
 	       reports/*.json reports/figures/*.png app/data/*
-	find data -name '.gitkeep' -delete -o -true >/dev/null 2>&1 || true
-	touch data/interim/.gitkeep data/processed/.gitkeep
+	touch data/raw/.gitkeep data/interim/.gitkeep data/processed/.gitkeep
 
 clean: clean-derived ## Also delete the raw pages, forcing a full re-collection
 	rm -rf data/raw/*
