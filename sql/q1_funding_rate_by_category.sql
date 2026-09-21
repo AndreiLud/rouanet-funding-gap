@@ -12,11 +12,13 @@ WITH banded AS (
         area,
         segmento,
         UF,
+        -- Banded on the REQUESTED amount, matching the target's denominator.
+        -- valor_aprovado is revised after the outcome, see docs/data_dictionary.md.
         CASE
-            WHEN valor_aprovado <   100000 THEN 'under 100k'
-            WHEN valor_aprovado <   500000 THEN '100k to 500k'
-            WHEN valor_aprovado <  1000000 THEN '500k to 1M'
-            WHEN valor_aprovado <  5000000 THEN '1M to 5M'
+            WHEN valor_solicitado <   100000 THEN 'under 100k'
+            WHEN valor_solicitado <   500000 THEN '100k to 500k'
+            WHEN valor_solicitado <  1000000 THEN '500k to 1M'
+            WHEN valor_solicitado <  5000000 THEN '1M to 5M'
             ELSE '5M and above'
         END AS faixa_valor,
         target_ge50
